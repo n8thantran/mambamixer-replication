@@ -1,0 +1,35 @@
+TSM2 Results: MSE
+Dataset               H=96      H=192      H=336      H=720
+-------------------------------------------------------
+ETTh1              0.4411         —         —         —
+ETTh2                   —         —         —         —
+ETTm1                   —         —         —         —
+ETTm2                   —         —         —         —
+electricity             —         —         —         —
+exchange_rate           —         —         —         —
+traffic                 —         —         —         —
+weather                 —         —         —         —
+
+TSM2 Results: MAE
+Dataset               H=96      H=192      H=336      H=720
+-------------------------------------------------------
+ETTh1              0.4491         —         —         —
+ETTh2                   —         —         —         —
+ETTm1                   —         —         —         —
+ETTm2                   —         —         —         —
+electricity             —         —         —         —
+exchange_rate           —         —         —         —
+traffic                 —         —         —         —
+weather                 —         —         —         —
+
+Paper Target (MSE):
+Dataset               H=96      H=192      H=336      H=720
+-------------------------------------------------------
+ETTh1               0.375     0.398     0.419     0.422
+ETTh2               0.253     0.334     0.347     0.401
+ETTm1               0.322     0.349     0.366     0.407
+ETTm2               0.173     0.230     0.279     0.388
+electricity         0.142     0.153     0.175     0.209
+exchange_rate       0.163     0.229     0.383     0.999
+traffic             0.396     0.408     0.427     0.449
+weather             0.161     0.208     0.252     0.337

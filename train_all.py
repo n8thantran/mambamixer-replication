@@ -1,6 +1,5 @@
 """
 Training script for TSM2 on all 8 datasets × 4 horizons = 32 experiments.
-Designed for efficiency with dataset-specific hyperparameters tuned for generalization.
 """
 
 import os
@@ -18,100 +17,88 @@ from tsm2_model import TSM2
 from data_loader import get_dataloaders, DATASET_INFO
 
 
-# Dataset-specific configs, tuned to balance quality and training time
+# Dataset-specific configs
 CONFIGS = {
     'ETTh1': {
-        'd_model': 16, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 5e-4, 'weight_decay': 0.05, 'batch_size': 64, 'epochs': 20, 'patience': 5,
-        'dropout': 0.5, 'patch_len': 16, 'stride': 8,
+        'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 128, 'epochs': 15, 'patience': 5,
+        'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
     'ETTh2': {
-        'd_model': 16, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 5e-4, 'weight_decay': 0.05, 'batch_size': 64, 'epochs': 20, 'patience': 5,
-        'dropout': 0.5, 'patch_len': 16, 'stride': 8,
+        'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 128, 'epochs': 15, 'patience': 5,
+        'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
     'ETTm1': {
-        'd_model': 16, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 1e-3, 'weight_decay': 0.05, 'batch_size': 128, 'epochs': 15, 'patience': 5,
+        'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 128, 'epochs': 15, 'patience': 5,
         'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
     'ETTm2': {
-        'd_model': 16, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 1e-3, 'weight_decay': 0.05, 'batch_size': 128, 'epochs': 15, 'patience': 5,
+        'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 128, 'epochs': 15, 'patience': 5,
         'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
     'electricity': {
         'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 5e-4, 'weight_decay': 0.01, 'batch_size': 16, 'epochs': 10, 'patience': 3,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 8, 'epochs': 8, 'patience': 3,
         'dropout': 0.2, 'patch_len': 16, 'stride': 8,
     },
     'exchange_rate': {
-        'd_model': 16, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 5e-4, 'weight_decay': 0.05, 'batch_size': 32, 'epochs': 30, 'patience': 8,
-        'dropout': 0.5, 'patch_len': 16, 'stride': 8,
+        'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 32, 'epochs': 20, 'patience': 5,
+        'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
     'traffic': {
         'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 1,
-        'lr': 5e-4, 'weight_decay': 0.01, 'batch_size': 4, 'epochs': 10, 'patience': 3,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 4, 'epochs': 8, 'patience': 3,
         'dropout': 0.2, 'patch_len': 16, 'stride': 8,
     },
     'weather': {
         'd_model': 32, 'num_layers': 2, 'd_state': 16, 'd_conv': 4, 'expand': 2,
-        'lr': 1e-3, 'weight_decay': 0.01, 'batch_size': 64, 'epochs': 15, 'patience': 5,
+        'lr': 1e-4, 'weight_decay': 0.01, 'batch_size': 64, 'epochs': 12, 'patience': 5,
         'dropout': 0.3, 'patch_len': 16, 'stride': 8,
     },
 }
 
 
 def train_epoch(model, train_loader, optimizer, criterion, device, max_grad_norm=1.0):
-    """Train one epoch."""
     model.train()
     total_loss = 0
     n_batches = 0
-    
     for batch_x, batch_y in train_loader:
         batch_x = batch_x.to(device, non_blocking=True)
         batch_y = batch_y.to(device, non_blocking=True)
-        
         optimizer.zero_grad(set_to_none=True)
         pred = model(batch_x)
         loss = criterion(pred, batch_y)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
         optimizer.step()
-        
         total_loss += loss.item()
         n_batches += 1
-    
     return total_loss / max(n_batches, 1)
 
 
 @torch.no_grad()
 def evaluate(model, data_loader, device):
-    """Evaluate model, return MSE and MAE."""
     model.eval()
     all_preds = []
     all_targets = []
-    
     for batch_x, batch_y in data_loader:
         batch_x = batch_x.to(device, non_blocking=True)
         batch_y = batch_y.to(device, non_blocking=True)
-        
         pred = model(batch_x)
         all_preds.append(pred.cpu())
         all_targets.append(batch_y.cpu())
-    
     all_preds = torch.cat(all_preds, dim=0)
     all_targets = torch.cat(all_targets, dim=0)
-    
     mse = ((all_preds - all_targets) ** 2).mean().item()
     mae = (all_preds - all_targets).abs().mean().item()
-    
     return {'mse': mse, 'mae': mae}
 
 
 def train_experiment(dataset_name, pred_len, device, data_dir='./data', save_dir='./checkpoints'):
-    """Train one experiment. Returns test metrics."""
     print(f"\n{'='*60}")
     print(f"Training TSM2: {dataset_name}, H={pred_len}")
     print(f"{'='*60}")
@@ -119,13 +106,11 @@ def train_experiment(dataset_name, pred_len, device, data_dir='./data', save_dir
     cfg = CONFIGS[dataset_name]
     num_variates = DATASET_INFO[dataset_name]['num_variates']
     
-    # Data
     train_loader, val_loader, test_loader = get_dataloaders(
         dataset_name, seq_len=512, pred_len=pred_len,
         batch_size=cfg['batch_size'], data_dir=data_dir, num_workers=2,
     )
     
-    # Model
     model = TSM2(
         num_variates=num_variates, seq_len=512, pred_len=pred_len,
         patch_len=cfg['patch_len'], stride=cfg['stride'],
@@ -163,20 +148,17 @@ def train_experiment(dataset_name, pred_len, device, data_dir='./data', save_dir
         else:
             patience_counter += 1
         
-        print(f"  Epoch {epoch+1:3d}/{cfg['epochs']} | "
-              f"Train: {train_loss:.4f} | Val MSE: {val_metrics['mse']:.4f} | "
-              f"LR: {optimizer.param_groups[0]['lr']:.2e} | {elapsed:.1f}s{improved}")
+        print(f"  E{epoch+1:3d}/{cfg['epochs']} | "
+              f"Train: {train_loss:.4f} | Val: {val_metrics['mse']:.4f} | {elapsed:.1f}s{improved}")
         
         if patience_counter >= cfg['patience']:
             print(f"  Early stopping at epoch {epoch+1}")
             break
     
-    # Test with best model
     model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
     test_metrics = evaluate(model, test_loader, device)
     print(f"  >>> Test MSE: {test_metrics['mse']:.6f}, MAE: {test_metrics['mae']:.6f}")
     
-    # Clean up
     del model
     torch.cuda.empty_cache()
     
@@ -210,7 +192,6 @@ def main():
         datasets = [args.dataset]
         horizons = [96, 192, 336, 720]
     else:
-        # Run all 32 experiments - small datasets first
         datasets = ['ETTh1', 'ETTh2', 'exchange_rate', 'ETTm1', 'ETTm2', 
                      'weather', 'electricity', 'traffic']
         horizons = [96, 192, 336, 720]
@@ -233,16 +214,13 @@ def main():
                 traceback.print_exc()
                 all_results[dataset][key] = {'mse': -1, 'mae': -1, 'error': str(e)}
             
-            # Save after each experiment
             with open(results_path, 'w') as f:
                 json.dump(all_results, f, indent=2)
     
-    # Print summary table
     print_results_table(all_results, results_path)
 
 
 def print_results_table(all_results, results_path=None):
-    """Print a nice results summary table."""
     targets = {
         'ETTh1': {96: 0.375, 192: 0.398, 336: 0.419, 720: 0.422},
         'ETTh2': {96: 0.253, 192: 0.334, 336: 0.347, 720: 0.401},
@@ -255,71 +233,66 @@ def print_results_table(all_results, results_path=None):
     }
     
     print("\n" + "="*90)
-    print("TSM2 RESULTS (MSE / MAE) — Ours vs Paper Target")
+    print("TSM2 RESULTS — Ours MSE (Paper Target MSE)")
     print("="*90)
     
     datasets_order = ['ETTh1', 'ETTh2', 'ETTm1', 'ETTm2', 'electricity', 'exchange_rate', 'traffic', 'weather']
     horizons = [96, 192, 336, 720]
     
-    header = f"{'Dataset':<15}"
+    print(f"{'Dataset':<15}", end="")
     for h in horizons:
-        header += f"  {'H='+str(h):>20s}"
-    print(header)
-    print("-" * 95)
+        print(f" {'H='+str(h):>18s}", end="")
+    print()
+    print("-" * 87)
     
     for dataset in datasets_order:
-        row = f"{dataset:<15}"
+        print(f"{dataset:<15}", end="")
         for h in horizons:
             mse = all_results.get(dataset, {}).get(str(h), {}).get('mse', float('nan'))
             target = targets.get(dataset, {}).get(h, float('nan'))
             if mse and mse > 0:
-                ratio = mse / target if target > 0 else 0
-                row += f"  {mse:.3f}({target:.3f}){ratio:.1f}x"
+                print(f" {mse:.3f}({target:.3f})", end="")
             else:
-                row += f"      -  ({target:.3f})    "
-        print(row)
+                print(f"     -({target:.3f})", end="")
+        print()
     
-    # Save table to file
     if results_path:
         table_path = results_path.replace('.json', '_table.txt')
         with open(table_path, 'w') as f:
-            f.write("TSM2 Results: MSE\n")
+            f.write("TSM2 Replication Results\n")
+            f.write("="*60 + "\n\n")
+            
+            f.write("MSE Results:\n")
             f.write(f"{'Dataset':<15} {'H=96':>10} {'H=192':>10} {'H=336':>10} {'H=720':>10}\n")
             f.write("-" * 55 + "\n")
             for dataset in datasets_order:
                 row = f"{dataset:<15}"
                 for h in horizons:
                     mse = all_results.get(dataset, {}).get(str(h), {}).get('mse', float('nan'))
-                    if mse and mse > 0:
-                        row += f" {mse:>9.4f}"
-                    else:
-                        row += f" {'—':>9s}"
+                    row += f" {mse:>9.4f}" if mse and mse > 0 else "         -"
                 f.write(row + "\n")
             
-            f.write("\nTSM2 Results: MAE\n")
+            f.write("\nMAE Results:\n")
             f.write(f"{'Dataset':<15} {'H=96':>10} {'H=192':>10} {'H=336':>10} {'H=720':>10}\n")
             f.write("-" * 55 + "\n")
             for dataset in datasets_order:
                 row = f"{dataset:<15}"
                 for h in horizons:
                     mae = all_results.get(dataset, {}).get(str(h), {}).get('mae', float('nan'))
-                    if mae and mae > 0:
-                        row += f" {mae:>9.4f}"
-                    else:
-                        row += f" {'—':>9s}"
+                    row += f" {mae:>9.4f}" if mae and mae > 0 else "         -"
                 f.write(row + "\n")
             
-            f.write("\nPaper Target (MSE):\n")
+            f.write("\nPaper Target MSE (Table 5):\n")
             f.write(f"{'Dataset':<15} {'H=96':>10} {'H=192':>10} {'H=336':>10} {'H=720':>10}\n")
             f.write("-" * 55 + "\n")
             for dataset in datasets_order:
                 row = f"{dataset:<15}"
                 for h in horizons:
                     target = targets.get(dataset, {}).get(h)
-                    row += f" {target:>9.3f}" if target else f" {'—':>9s}"
+                    row += f" {target:>9.3f}" if target else "         -"
                 f.write(row + "\n")
         
-        print(f"\nResults table saved to {table_path}")
+        print(f"\nResults saved to {table_path}")
 
 
 if __name__ == '__main__':
