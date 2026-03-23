@@ -1,28 +1,31 @@
-TSM2 Results: MSE
+TSM2 Replication Results
+============================================================
+
+MSE Results:
 Dataset               H=96      H=192      H=336      H=720
 -------------------------------------------------------
-ETTh1              0.4411         —         —         —
-ETTh2                   —         —         —         —
-ETTm1                   —         —         —         —
-ETTm2                   —         —         —         —
-electricity             —         —         —         —
-exchange_rate           —         —         —         —
-traffic                 —         —         —         —
-weather                 —         —         —         —
+ETTh1              0.4171    0.4456    0.4676    0.4849
+ETTh2              0.3036    0.3783    0.3979    0.4226
+ETTm1                   -         -         -         -
+ETTm2                   -         -         -         -
+electricity             -         -         -         -
+exchange_rate      0.1182    0.2123    0.3751    0.9796
+traffic                 -         -         -         -
+weather                 -         -         -         -
 
-TSM2 Results: MAE
+MAE Results:
 Dataset               H=96      H=192      H=336      H=720
 -------------------------------------------------------
-ETTh1              0.4491         —         —         —
-ETTh2                   —         —         —         —
-ETTm1                   —         —         —         —
-ETTm2                   —         —         —         —
-electricity             —         —         —         —
-exchange_rate           —         —         —         —
-traffic                 —         —         —         —
-weather                 —         —         —         —
+ETTh1              0.4346    0.4488    0.4620    0.4830
+ETTh2              0.3560    0.4016    0.4236    0.4486
+ETTm1                   -         -         -         -
+ETTm2                   -         -         -         -
+electricity             -         -         -         -
+exchange_rate      0.2510    0.3318    0.4533    0.7534
+traffic                 -         -         -         -
+weather                 -         -         -         -
 
-Paper Target (MSE):
+Paper Target MSE (Table 5):
 Dataset               H=96      H=192      H=336      H=720
 -------------------------------------------------------
 ETTh1               0.375     0.398     0.419     0.422
