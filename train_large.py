@@ -1,6 +1,6 @@
 """
 Fast training for large datasets (electricity, traffic).
-Uses larger batch sizes with gradient accumulation and fewer epochs.
+Uses gradient accumulation and fewer epochs to fit within time constraints.
 """
 
 import os
@@ -84,10 +84,9 @@ def main():
     else:
         raise ValueError(f"Use train_all.py for {args.dataset}")
 
-    info = DATASET_INFO[args.dataset]
-    seq_len = info['seq_len']
+    num_variates = DATASET_INFO[args.dataset]['num_variates']
+    seq_len = 512
     pred_len = args.pred_len
-    n_vars = info['n_vars']
 
     print(f"\n{'='*60}")
     print(f"Training TSM2: {args.dataset}, H={pred_len}")
@@ -99,21 +98,24 @@ def main():
     )
 
     model = TSM2(
-        seq_len=seq_len, pred_len=pred_len, n_vars=n_vars,
-        d_model=cfg['d_model'], num_layers=cfg['num_layers'],
-        d_state=cfg['d_state'], d_conv=cfg['d_conv'], expand=cfg['expand'],
-        dropout=cfg['dropout'], patch_len=cfg['patch_len'], stride=cfg['stride'],
+        num_variates=num_variates, seq_len=seq_len, pred_len=pred_len,
+        patch_len=cfg['patch_len'], stride=cfg['stride'],
+        d_model=cfg['d_model'], d_state=cfg['d_state'],
+        d_conv=cfg['d_conv'], expand=cfg['expand'],
+        num_layers=cfg['num_layers'], dropout=cfg['dropout'],
     ).to(device)
 
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     optimizer = AdamW(model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
-    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
+    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'], eta_min=1e-6)
     criterion = nn.MSELoss()
+
+    os.makedirs('./checkpoints', exist_ok=True)
+    ckpt_path = f'./checkpoints/{args.dataset}_H{pred_len}.pt'
 
     best_val = float('inf')
     patience_counter = 0
-    best_state = None
 
     for epoch in range(1, cfg['epochs'] + 1):
         t0 = time.time()
@@ -126,7 +128,7 @@ def main():
         improved = val_metrics['mse'] < best_val
         if improved:
             best_val = val_metrics['mse']
-            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            torch.save(model.state_dict(), ckpt_path)
             patience_counter = 0
         else:
             patience_counter += 1
@@ -137,10 +139,7 @@ def main():
             print(f"  Early stopping at epoch {epoch}")
             break
 
-    if best_state is not None:
-        model.load_state_dict(best_state)
-        model = model.to(device)
-
+    model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
     test_metrics = evaluate(model, test_loader, device)
     print(f"  >>> Test MSE: {test_metrics['mse']:.6f}, MAE: {test_metrics['mae']:.6f}")
 
@@ -162,34 +161,6 @@ def main():
 
     with open(results_file, 'w') as f:
         json.dump(all_results, f, indent=2)
-
-    # Print summary table
-    TARGETS = {
-        'ETTh1': {96: 0.375, 192: 0.398, 336: 0.419, 720: 0.422},
-        'ETTh2': {96: 0.253, 192: 0.334, 336: 0.347, 720: 0.401},
-        'ETTm1': {96: 0.322, 192: 0.349, 336: 0.366, 720: 0.407},
-        'ETTm2': {96: 0.173, 192: 0.230, 336: 0.279, 720: 0.388},
-        'electricity': {96: 0.142, 192: 0.153, 336: 0.175, 720: 0.209},
-        'exchange_rate': {96: 0.163, 192: 0.229, 336: 0.383, 720: 0.999},
-        'traffic': {96: 0.396, 192: 0.408, 336: 0.427, 720: 0.449},
-        'weather': {96: 0.161, 192: 0.208, 336: 0.252, 720: 0.337},
-    }
-
-    print(f"\n{'='*90}")
-    print(f"TSM2 RESULTS — Ours MSE (Paper Target MSE)")
-    print(f"{'='*90}")
-    print(f"{'Dataset':<16} {'H=96':>18} {'H=192':>18} {'H=336':>18} {'H=720':>18}")
-    print("-" * 87)
-    for ds in ['ETTh1', 'ETTh2', 'ETTm1', 'ETTm2', 'electricity', 'exchange_rate', 'traffic', 'weather']:
-        row = f"{ds:<16}"
-        for h in [96, 192, 336, 720]:
-            target = TARGETS[ds][h]
-            if ds in all_results and str(h) in all_results[ds]:
-                ours = all_results[ds][str(h)]['mse']
-                row += f" {ours:.3f}({target:.3f})"
-            else:
-                row += f"     -({target:.3f})"
-        print(row)
 
     print(f"\nResults saved to {results_file}")
 
